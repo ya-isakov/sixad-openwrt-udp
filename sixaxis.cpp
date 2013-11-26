@@ -139,6 +139,7 @@ void do_joystick(int fd, unsigned char* buf, struct dev_joystick joystick)
     if (velZ > -30 && velZ < 30) velZ = 0;
 
     if (joystick.buttons) {
+//        if (b1 & 0x01) { syslog(LOG_INFO, "Button!"); };
         //part1
 /*        if (last_jb1 != b1) {
             uinput_send(fd, EV_KEY, BTN_JOYSTICK + 0, b1 & 0x01 ? 1 : 0);

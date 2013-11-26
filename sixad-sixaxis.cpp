@@ -222,6 +222,10 @@ static void process_sixaxis(struct device_settings settings, const char *mac)
     if (debug) syslog(LOG_ERR, "Read loop was broken on the Sixaxis process");
 }
 
+int process_udp(int fd) {
+   
+}
+
 int main(int argc, char *argv[])
 {
     struct pollfd p[4];
@@ -231,6 +235,8 @@ int main(int argc, char *argv[])
 //    pthread_t uinput_listen_thread, rumble_listen_thread;
     sigset_t sigs;
     short events;
+    int sockfd;
+    struct sockaddr_in servaddr, cliaddr;
 
     if (argc < 3) {
         std::cout << "Running " << argv[0] << " requires 'sixad'. Please run sixad instead" << std::endl;
@@ -291,12 +297,18 @@ int main(int argc, char *argv[])
 
     p[0].events = POLLIN | POLLERR | POLLHUP;
     p[1].events = POLLIN | POLLERR | POLLHUP;
-//    p[2].events = POLLIN | POLLERR | POLLHUP;
+    p[2].events = POLLIN | POLLERR | POLLHUP;
 //    p[3].events = POLLIN | POLLERR | POLLHUP;
     
     p[0].fd = 0;
     p[1].fd = 1;
+    p[2].fd = socket(AF_INET, SOCK_DGRAM, 0);
     
+    bzero(&servaddr, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htons(26760);
+    bind(p[2].fd, (struct sockaddr *)&servaddr, sizeof(servaddr));
 
 /*    p[2].fd = ufd->js;
     p[3].fd = ufd->mk;
@@ -305,7 +317,7 @@ int main(int argc, char *argv[])
       p[2].fd = ufd->mk;*/
 
 //    int idx = (ufd->js && ufd->mk) ? 4 : 3;
-    int idx = 2;
+    int idx = 3;
 
     while (!io_canceled()) {
         int i;
@@ -319,11 +331,14 @@ int main(int argc, char *argv[])
         if (ppoll(p, idx, &timeout, &sigs) < 1)
             continue;
 
+        if (p[2].revents & POLLIN) {
+            process_udp(p[2].fd)
+        }
         if (p[1].revents & POLLIN) {
             process_sixaxis(settings, mac);
         }
 
-        events = p[0].revents | p[1].revents;// | p[2].revents | p[3].revents;
+        events = p[0].revents | p[1].revents | p[2].revents;// | p[3].revents;
 
         if (events & (POLLERR | POLLHUP)) {
             sig_term(0);
