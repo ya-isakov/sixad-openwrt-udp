@@ -16,7 +16,7 @@
  */
 
 #include "sixaxis.h"
-#include "uinput.h"
+//#include "uinput.h"
 #include "shared.h"
 
 #include <syslog.h>
@@ -140,7 +140,7 @@ void do_joystick(int fd, unsigned char* buf, struct dev_joystick joystick)
 
     if (joystick.buttons) {
         //part1
-        if (last_jb1 != b1) {
+/*        if (last_jb1 != b1) {
             uinput_send(fd, EV_KEY, BTN_JOYSTICK + 0, b1 & 0x01 ? 1 : 0);
             uinput_send(fd, EV_KEY, BTN_JOYSTICK + 1, b1 & 0x02 ? 1 : 0);
             uinput_send(fd, EV_KEY, BTN_JOYSTICK + 2, b1 & 0x04 ? 1 : 0);
@@ -164,7 +164,7 @@ void do_joystick(int fd, unsigned char* buf, struct dev_joystick joystick)
         //part3
         if (last_jb3 != b3) {
             uinput_send(fd, EV_KEY, BTN_JOYSTICK + 16, b3 & 0x01 ? 1 : 0);
-        }
+        }*/
 
         if (b1 > 0 || b2 > 0 || b3 > 0) {
           set_active(true);
@@ -173,10 +173,10 @@ void do_joystick(int fd, unsigned char* buf, struct dev_joystick joystick)
 
     //axis
     if (joystick.axis) {
-        uinput_send(fd, EV_ABS, 0, lx);
+/*        uinput_send(fd, EV_ABS, 0, lx);
         uinput_send(fd, EV_ABS, 1, ly);
         uinput_send(fd, EV_ABS, 2, rx);
-        uinput_send(fd, EV_ABS, 3, ry);
+        uinput_send(fd, EV_ABS, 3, ry);*/
 
         if (lx != 0 || ly != 0 || rx != 0 || ry != 0) {
           set_active(true);
@@ -184,16 +184,16 @@ void do_joystick(int fd, unsigned char* buf, struct dev_joystick joystick)
     }
 
     //accelerometer RAW
-    if (joystick.accel) {
+/*    if (joystick.accel) {
         uinput_send(fd, EV_ABS, 4, acx);
         uinput_send(fd, EV_ABS, 5, acy);
         uinput_send(fd, EV_ABS, 6, acz);
         uinput_send(fd, EV_ABS, 7, gyro);
-    }
+    }*/
 
     //buttons (sensible, as axis)
     if (joystick.sbuttons) {
-        uinput_send(fd, EV_ABS, 8, up);
+/*        uinput_send(fd, EV_ABS, 8, up);
         uinput_send(fd, EV_ABS, 9, right);
         uinput_send(fd, EV_ABS, 10, down);
         uinput_send(fd, EV_ABS, 11, left);
@@ -204,7 +204,7 @@ void do_joystick(int fd, unsigned char* buf, struct dev_joystick joystick)
         uinput_send(fd, EV_ABS, 16+AXIS_PADDING, tri);
         uinput_send(fd, EV_ABS, 17+AXIS_PADDING, cir);
         uinput_send(fd, EV_ABS, 18+AXIS_PADDING, cro);
-        uinput_send(fd, EV_ABS, 19+AXIS_PADDING, squ);
+        uinput_send(fd, EV_ABS, 19+AXIS_PADDING, squ);*/
 
         if (up > 0 || right > 0 || down > 0 || left > 0 || l2 > 0 || r2 > 0 || l1 > 0 || r1 > 0 || tri > 0 || cir > 0 || cro > 0 || squ > 0 ) {
           set_active(true);
@@ -212,7 +212,7 @@ void do_joystick(int fd, unsigned char* buf, struct dev_joystick joystick)
     }
 
     //acceleration
-    if (joystick.accon) {
+/*    if (joystick.accon) {
         uinput_send(fd, EV_ABS, 20+AXIS_PADDING, accX);
         uinput_send(fd, EV_ABS, 21+AXIS_PADDING, accY);
         uinput_send(fd, EV_ABS, 22+AXIS_PADDING, accZ);
@@ -230,18 +230,18 @@ void do_joystick(int fd, unsigned char* buf, struct dev_joystick joystick)
         uinput_send(fd, EV_ABS, 26+AXIS_PADDING, posX);
         uinput_send(fd, EV_ABS, 27+AXIS_PADDING, posY);
         uinput_send(fd, EV_ABS, 28+AXIS_PADDING, posZ);
-    }
+    }*/
 
     last_jb1 = b1;
     last_jb2 = b2;
     last_jb3 = b3;
 
-    uinput_send(fd, EV_SYN, SYN_REPORT, 0);
+//    uinput_send(fd, EV_SYN, SYN_REPORT, 0);
 }
 
 void do_input(int fd, unsigned char* buf, struct dev_input input)
 {
-    b1 = buf[3];
+/*    b1 = buf[3];
     b2 = buf[4];
     b3 = buf[5];
     lx = buf[7] - 128;
@@ -359,7 +359,7 @@ void do_input(int fd, unsigned char* buf, struct dev_input input)
             uinput_send(fd, EV_REL, rel, ry);
           }
       }
-    }
+    }*/
 
     if (b1 > 0 || b2 > 0 || b3 > 0 || lx != 0 || ly != 0 || rx != 0 || ry != 0) {
       set_active(true);
@@ -369,7 +369,7 @@ void do_input(int fd, unsigned char* buf, struct dev_input input)
     last_ib2 = b2;
     last_ib3 = b3;
 
-    uinput_send(fd, EV_SYN, SYN_REPORT, 0);
+//    uinput_send(fd, EV_SYN, SYN_REPORT, 0);
 
     if (rw_timer > 0xff)
       rw_timer = 0;

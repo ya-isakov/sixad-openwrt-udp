@@ -27,6 +27,7 @@
 #include <syslog.h>
 #include <time.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
 
 int csk = 0;
 int isk = 1;
@@ -40,9 +41,9 @@ volatile int weak = 0;
 volatile int strong = 0;
 volatile int timeout = 0;
 
-struct uinput_fd *ufd;
+//struct uinput_fd *ufd;
 
-static void uinput_listen()
+/*static void uinput_listen()
 {
         struct input_event event;
         struct uinput_ff_upload upload;
@@ -144,7 +145,7 @@ static void uinput_listen()
         }
 
         pthread_exit((void*)1);
-}
+}*/
 
 static void rumble_listen()
 {
@@ -199,14 +200,13 @@ static void process_sixaxis(struct device_settings settings, const char *mac)
         if (br < 0) {
             break;
         } else if (br==50 && buf[0]==0xa1 && buf[1]==0x01 && buf[2]==0x00) { //only continue if we've got a Sixaxis
-            if (settings.auto_disconnect && buf[34] != 0x00 && buf[34] < 0xB5) {
+/*            if (settings.auto_disconnect && buf[34] != 0x00 && buf[34] < 0xB5) {
                 syslog(LOG_INFO, "Sixaxis out of reach, auto-disconneting now...");
                 sig_term(0);
                 break;
-            }
-
-            if (settings.joystick.enabled) do_joystick(ufd->js, buf, settings.joystick);
-            if (settings.input.enabled) do_input(ufd->mk, buf, settings.input);
+            }*/
+            if (settings.joystick.enabled) do_joystick(0, buf, settings.joystick);
+            if (settings.input.enabled) do_input(0, buf, settings.input);
 
         } else if (br==50 && buf[0]==0xa1 && buf[1]==0x01 && buf[2]==0xff) {
             if (debug) syslog(LOG_ERR, "Got 0xff Sixaxis buffer, ignored");
@@ -228,7 +228,7 @@ int main(int argc, char *argv[])
     struct timespec timeout;
     struct device_settings settings;
     struct sigaction sa;
-    pthread_t uinput_listen_thread, rumble_listen_thread;
+//    pthread_t uinput_listen_thread, rumble_listen_thread;
     sigset_t sigs;
     short events;
 
@@ -245,21 +245,21 @@ int main(int argc, char *argv[])
     settings = init_values(mac);
     settings.remote.enabled = false;
 
-    ufd = uinput_open(DEV_TYPE_SIXAXIS, mac, settings);
+    //ufd = uinput_open(DEV_TYPE_SIXAXIS, mac, settings);
 
-    if (ufd->js < 0 || ufd->mk < 0) {
+/*    if (ufd->js < 0 || ufd->mk < 0) {
         return 1;
     } else if (ufd->js == 0 && ufd->mk == 0) {
         syslog(LOG_ERR, "sixaxis config has no joystick or input mode selected - please choose one!");
         return 1;
-    }
+    }*/
 
     enable_sixaxis(csk);
     led_n = set_sixaxis_led(csk, settings.led, settings.rumble.enabled);
 
     if (settings.rumble.enabled) {
       old_rumble_mode = settings.rumble.old_mode;
-      if (pthread_create(&uinput_listen_thread, NULL, (void *(*)(void *))uinput_listen, NULL)) {
+/*      if (pthread_create(&uinput_listen_thread, NULL, (void *(*)(void *))uinput_listen, NULL)) {
               syslog(LOG_ERR, "error starting uinput listen thread");
               return 1;
       }
@@ -268,7 +268,7 @@ int main(int argc, char *argv[])
               syslog(LOG_ERR, "error starting rumble listen thread");
               return 1;
           }
-      }
+      }*/
     }
 
     sigfillset(&sigs);
@@ -291,23 +291,26 @@ int main(int argc, char *argv[])
 
     p[0].events = POLLIN | POLLERR | POLLHUP;
     p[1].events = POLLIN | POLLERR | POLLHUP;
-    p[2].events = POLLIN | POLLERR | POLLHUP;
-    p[3].events = POLLIN | POLLERR | POLLHUP;
+//    p[2].events = POLLIN | POLLERR | POLLHUP;
+//    p[3].events = POLLIN | POLLERR | POLLHUP;
     
     p[0].fd = 0;
     p[1].fd = 1;
-    p[2].fd = ufd->js;
+    
+
+/*    p[2].fd = ufd->js;
     p[3].fd = ufd->mk;
 
     if (!ufd->js)
-      p[2].fd = ufd->mk;
+      p[2].fd = ufd->mk;*/
 
-    int idx = (ufd->js && ufd->mk) ? 4 : 3;
+//    int idx = (ufd->js && ufd->mk) ? 4 : 3;
+    int idx = 2;
 
     while (!io_canceled()) {
         int i;
 
-        for (i = 0; i < 4; i++)
+        for (i = 0; i < idx; i++)
             p[i].revents = 0;
 
         timeout.tv_sec = 1;
@@ -320,7 +323,7 @@ int main(int argc, char *argv[])
             process_sixaxis(settings, mac);
         }
 
-        events = p[0].revents | p[1].revents | p[2].revents | p[3].revents;
+        events = p[0].revents | p[1].revents;// | p[2].revents | p[3].revents;
 
         if (events & (POLLERR | POLLHUP)) {
             sig_term(0);
@@ -328,7 +331,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (settings.rumble.enabled) {
+/*    if (settings.rumble.enabled) {
       if (pthread_cancel(uinput_listen_thread)) {
         if (pthread_join(uinput_listen_thread, NULL)) {
           syslog(LOG_ERR, "Error canceling uinput listen thread");
@@ -341,18 +344,18 @@ int main(int argc, char *argv[])
             }
           }
       }
-    }
+    }*/
 
     if (debug) syslog(LOG_INFO, "Closing uinput...");
 
-    if (settings.joystick.enabled) {
+/*    if (settings.joystick.enabled) {
         uinput_close(ufd->js, debug);
     }
     if (settings.input.enabled) {
         uinput_close(ufd->mk, debug);
-    }
+    }*/
 
-    delete ufd;
+//    delete ufd;
     
     do_rumble(csk, 10, 0xff, 0xff, 0x01);
 
