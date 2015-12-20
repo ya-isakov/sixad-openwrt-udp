@@ -1,0 +1,56 @@
+#
+# Copyright (C) 2009-2012 OpenWrt.org
+#
+# This is free software, licensed under the GNU General Public License v2.
+# See /LICENSE for more information.
+#
+
+include $(TOPDIR)/rules.mk
+
+PKG_NAME:=sixad
+PKG_RELEASE:=1
+PKG_VERSION:=1
+PKG_SOURCE_URL:=http://wireless.kernel.org/download/crda
+PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
+PKG_MD5SUM:=bd0b3fbd92850574c4de7047a06f6083
+PKG_BUILD_DIR:=$(BUILD_DIR)/sixad-$(PKG_VERSION)
+
+include $(INCLUDE_DIR)/package.mk
+
+define Package/sixad
+  SECTION:=net
+  CATEGORY:=Network
+  TITLE:=SixAd
+  DEPENDS:=+bluez-libs +libpthread +uclibcxx +librt +kmod-bluetooth
+  URL:=http://wireless.kernel.org/en/developers/Regulatory/CRDA
+endef
+
+define Package/sixad/description
+ This is the Central Regulatory Domain Agent for Linux. It serves one
+ purpose: tell Linux kernel what to enforce. In essence it is a udev
+ helper for communication between the kernel and userspace. You only
+ need to run this manually for debugging purposes. For manual changing
+ of regulatory domains use iw (iw reg set) or wpa_supplicant (feature
+ yet to be added).
+endef
+
+#define Build/Compile
+#	$(MAKE_VARS) $(MAKE) $(PKG_JOBS) -C $(PKG_BUILD_DIR) $(MAKE_FLAGS)
+#endef
+
+define Package/sixad/install
+	$(INSTALL_DIR) $(1)/usr/sbin
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bins/sixad-bin $(1)/usr/sbin
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bins/sixad-sixaxis $(1)/usr/sbin
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bins/sixad-raw $(1)/usr/sbin
+endef
+#	$(INSTALL_DIR) $(1)/sbin
+#	$(INSTALL_DIR) $(1)/etc/hotplug.d
+#	$(INSTALL_DIR) $(1)/etc/hotplug.d/platform
+#	$(INSTALL_DIR) $(1)/usr/lib/crda
+#	$(INSTALL_BIN) $(PKG_BUILD_DIR)/crda $(1)/sbin/
+#	$(INSTALL_DATA) ./files/hotplug.rule $(1)/etc/hotplug.d/platform/10-regulatory
+#	$(INSTALL_DATA) $(DL_DIR)/$(PKG_REGULATORY_SOURCE) $(1)/usr/lib/crda/regulatory.bin
+#endef
+
+$(eval $(call BuildPackage,sixad))

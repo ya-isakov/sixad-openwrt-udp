@@ -28,10 +28,13 @@
 #include <time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
+#include <list>
 
 int csk = 0;
 int isk = 1;
 int debug;
+std::list<int> clients;
 
 int led_n;
 bool old_rumble_mode;
@@ -40,6 +43,7 @@ volatile bool active = false;
 volatile int weak = 0;
 volatile int strong = 0;
 volatile int timeout = 0;
+bool msg = true;
 
 //struct uinput_fd *ufd;
 
@@ -173,12 +177,10 @@ static int get_time()
 static void process_sixaxis(struct device_settings settings, const char *mac)
 {
     int br;
-    bool msg = true;
-    unsigned char buf[128];
+    unsigned char buf[128], udpbuf[64];
 
     int last_time_action = get_time();
 
-    while (!io_canceled()) {
         br = read(isk, buf, sizeof(buf));
         if (msg) {
             syslog(LOG_INFO, "Connected 'PLAYSTATION(R)3 Controller (%s)' [Battery %02X]", mac, buf[31]);
@@ -193,37 +195,74 @@ static void process_sixaxis(struct device_settings settings, const char *mac)
             } else if (current_time-last_time_action >= settings.timeout.timeout) {
                 syslog(LOG_INFO, "Sixaxis was not in use, and timeout reached, disconneting...");
                 sig_term(0);
-                break;
+                return;
             }
         }
 
         if (br < 0) {
-            break;
-        } else if (br==50 && buf[0]==0xa1 && buf[1]==0x01 && buf[2]==0x00) { //only continue if we've got a Sixaxis
+            return;
+        } else if (br==13 && buf[0]==0xa1 && buf[1]==0x01 && buf[2]==0x00) { //only continue if we've got a Sixaxis
 /*            if (settings.auto_disconnect && buf[34] != 0x00 && buf[34] < 0xB5) {
                 syslog(LOG_INFO, "Sixaxis out of reach, auto-disconneting now...");
                 sig_term(0);
                 break;
             }*/
-            if (settings.joystick.enabled) do_joystick(0, buf, settings.joystick);
-            if (settings.input.enabled) do_input(0, buf, settings.input);
+//            if (settings.joystick.enabled) do_joystick(0, buf, settings.joystick);
+//            if (settings.input.enabled) do_input(0, buf, settings.input);
+              std::list<int>::iterator i;
+              for(i = clients.begin(); i != clients.end(); ++i) {
+                  bzero(&udpbuf, sizeof(udpbuf));
+                  udpbuf[0] = 0; //Ordinal number of gamepad
+                  udpbuf[1] = 2; //Magic num
+                  memmove(udpbuf+10, buf+3, 15);
+                  send(*i, udpbuf, sizeof(udpbuf), 0);
+              };
 
-        } else if (br==50 && buf[0]==0xa1 && buf[1]==0x01 && buf[2]==0xff) {
+        } else if (br==13 && buf[0]==0xa1 && buf[1]==0x01 && buf[2]==0xff) {
             if (debug) syslog(LOG_ERR, "Got 0xff Sixaxis buffer, ignored");
         } else if (buf[0]==0xa1 && buf[1]==0x01 && buf[2]==0x00) {
             syslog(LOG_ERR, "Bad Sixaxis buffer (out of battery?), disconneting now...");
 	    sig_term(0);
-            break;
+            return;
         } else {
             if (debug) syslog(LOG_ERR, "Non-Sixaxis packet received and ignored (0x%02x|0x%02x|0x%02x)", buf[0], buf[1], buf[2]);
         }
-    }
 
-    if (debug) syslog(LOG_ERR, "Read loop was broken on the Sixaxis process");
 }
 
 int process_udp(int fd) {
-   
+    char buf[6];
+    int clientfd;
+    struct sockaddr_in cliaddr;
+    socklen_t len = sizeof(cliaddr);
+    int n = recvfrom(fd, buf, 6, 0, (struct sockaddr *)&cliaddr, &len);
+    switch (buf[1]) {
+       case 0x00:
+          syslog(LOG_INFO, "Connected client %s", inet_ntoa(cliaddr.sin_addr));
+          buf[2] = 0x02; // Connected
+          buf[3] = 0x00; // Disconnected
+          buf[4] = 0x00; // Disconnected
+          buf[5] = 0x00; // Disconnected
+          sendto(fd, buf, 6, 0, (struct sockaddr *)&cliaddr, len);
+          cliaddr.sin_port = 26761;
+          clientfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+          connect(clientfd, (struct sockaddr *)&cliaddr, len);
+          clients.push_back(clientfd);
+          syslog(LOG_INFO, "Clients: %d", clients.size());
+          break;
+       case 0x01:
+          syslog(LOG_INFO, "Rumble gamepad N%d: 0x%02x, 0x%02x", buf[0], buf[2], buf[3]);
+          break;
+       case 0x02:
+          syslog(LOG_INFO, "Unknown, gamepad N%d: 0x%02x, 0x%02x", buf[0], buf[2], buf[3]);
+          break;
+       case 0x03:
+          syslog(LOG_INFO, "Get global config");
+          break;
+       case 0x04:
+          syslog(LOG_INFO, "Set global config");
+          break;
+    }
 }
 
 int main(int argc, char *argv[])
@@ -236,7 +275,7 @@ int main(int argc, char *argv[])
     sigset_t sigs;
     short events;
     int sockfd;
-    struct sockaddr_in servaddr, cliaddr;
+    struct sockaddr_in servaddr;
 
     if (argc < 3) {
         std::cout << "Running " << argv[0] << " requires 'sixad'. Please run sixad instead" << std::endl;
@@ -309,6 +348,7 @@ int main(int argc, char *argv[])
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port = htons(26760);
     bind(p[2].fd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+//    syslog(LOG_INFO, "UDP %d", p[2].fd);
 
 /*    p[2].fd = ufd->js;
     p[3].fd = ufd->mk;
@@ -328,19 +368,26 @@ int main(int argc, char *argv[])
         timeout.tv_sec = 1;
         timeout.tv_nsec = 0;
 
-        if (ppoll(p, idx, &timeout, &sigs) < 1)
-            continue;
+        int res = ppoll(p, idx, &timeout, &sigs);
+        if (res < 0) {
+            sig_term(0);
+            break;
+        };
+        if (res == 0) continue;
+//        syslog(LOG_INFO, "UDP events %d", p[2].revents);
 
         if (p[2].revents & POLLIN) {
-            process_udp(p[2].fd)
-        }
-        if (p[1].revents & POLLIN) {
+//            syslog(LOG_INFO, "Got UDP");
+            process_udp(p[2].fd);
+        };
+        if ((p[1].revents & POLLIN) && (clients.size() > 0)) {
+//            syslog(LOG_INFO, "begin");
             process_sixaxis(settings, mac);
         }
 
         events = p[0].revents | p[1].revents | p[2].revents;// | p[3].revents;
 
-        if (events & (POLLERR | POLLHUP)) {
+        if (events & (POLLERR | POLLHUP | POLLNVAL)) {
             sig_term(0);
             break;
         }
