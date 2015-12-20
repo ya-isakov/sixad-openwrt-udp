@@ -22,7 +22,6 @@
 #include <syslog.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <list>
 
 double dt, rc_dd, alpha_dd, rc_d, alpha_d, rc, alpha;
 
@@ -52,7 +51,7 @@ int last_ib1 = 0;
 int last_ib2 = 0;
 int last_ib3 = 0;
 
-void do_joystick(int fd, unsigned char* buf, struct dev_joystick joystick, std::list<struct sockaddr_in> clients)
+void do_joystick(int fd, unsigned char* buf, struct dev_joystick joystick)
 {
     newH.time = tv.tv_sec + tv.tv_usec*1e-6;
     newH.ax = buf[42]<<8 | buf[43];
